@@ -11,10 +11,18 @@ struct Compose {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 2 {
-        eprintln!("❌ Недостаточно аргументов.\nИспользование: script /Desktop/Project/src");
-    }
+    let services = parse_services(&args);
 
+    
+}
+
+fn parse_services(args: &Vec<String>) -> Result<Vec<String>, std::io::Error> {
+    if args.len() != 2 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "❌ Недостаточно аргументов.\nИспользование: script /Desktop/Project/src")
+        );
+    }
     let path = Path::new(&args[1])
         .join("docker-compose.yml");
     let container_content = fs::read_to_string(path)
@@ -26,4 +34,5 @@ fn main() {
     for service in yaml.services.keys() {
         services.push(service.clone());
     }
+    Ok(services)
 }
