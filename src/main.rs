@@ -1,7 +1,9 @@
 mod services;
 mod models;
-use std::{env, io};
+pub mod tui;
+pub use tui::keyboard;
 
+use std::{env, io};
 use ratatui::{
     backend::CrosstermBackend,
     Terminal,
@@ -10,10 +12,11 @@ use ratatui::{
     text::Span,
 };
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{self},
     terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     execute,
 };
+use crate::keyboard::keyboard_actions::KeyAction;
 use crate::services::parse_compose::parse_services;
 
 fn main() -> anyhow::Result<()> {
@@ -64,48 +67,30 @@ fn main() -> anyhow::Result<()> {
         })?;
 
         if event::poll(std::time::Duration::from_millis(200))? {
-            if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') => break,
-                    KeyCode::Down => {
-                        if let Some(i) = state.selected() {
-                            if i + 1 < services.len() {
-                                state.select(Some(i + 1));
-                            }
-                        }
-                    }
-                    KeyCode::Up => {
-                        if let Some(i) = state.selected() {
-                            if i > 0 {
-                                state.select(Some(i - 1));
-                            }
-                        }
-                    }
-                    KeyCode::Char(' ') => {
-                        if let Some(i) = state.selected() {
-                            selected[i] = !selected[i];
-                        }
-                    }
-                    KeyCode::Enter => {
-                        let chosen: Vec<_> = services
-                            .iter()
-                            .enumerate()
-                            .filter(|(i, _)| selected[*i])
-                            .map(|(_, s)| s.clone())
-                            .collect();
+            let result = keyboard::keyboard_interceptor::handle_event(
+                &event::read()?,
+                &mut state,
+                &services,
+                &mut selected,
+            );
+            match result {
+                Ok(action) => {
+                    match action {
+                        KeyAction::Quit => break,
+                        KeyAction::Enter(chosen) => {
+                            disable_raw_mode()?;
+                            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                            terminal.show_cursor()?;
 
-                        disable_raw_mode()?;
-                        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                        terminal.show_cursor()?;
-
-                        println!("Selected services:");
-                        for s in chosen {
-                            println!("{s}");
-                        }
-                        return Ok(());
+                            for s in chosen {
+                                println!("{s}");
+                            }
+                            return Ok(());
+                        },
+                        _ => {}
                     }
-                    _ => {}
-                }
+                },
+                Err(e) => println!("keyboard error {}", e)
             }
         }
     }
