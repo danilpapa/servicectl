@@ -1,7 +1,9 @@
 use crossterm::event::{Event, KeyCode, KeyModifiers};
+use ratatui::Terminal;
 use ratatui::widgets::{ListState};
 use crate::{services, ActionChoice};
 use crate::screen::AppScreen;
+use crate::terminal_setup::Backend;
 use crate::tui::keyboard::keyboard_actions::KeyAction;
 use crate::tui::keyboard::keyboard_actions::KeyAction::{Handled, Quit};
 
@@ -61,6 +63,7 @@ pub fn handle_option(
     option: &mut ActionChoice,
     screen: &mut AppScreen,
     services: &Vec<String>,
+    terminal: &mut Terminal<Backend>
 ) {
     if let Event::Key(key) = event {
         match key.code {
@@ -72,7 +75,7 @@ pub fn handle_option(
                 *screen = AppScreen::SelectServices;
             },
             KeyCode::Enter => {
-                _ = services::docker::run_services(&services, &option);
+                _ = services::docker::run_services(&services, &option, terminal);
             },
             _ => {}
         }

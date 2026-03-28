@@ -45,7 +45,7 @@ fn main() -> anyhow::Result<()> {
                         ])
                         .split(size);
 
-                    let title = List::new(vec![ListItem::new(Span::raw("Выбери сервисы которые надо пересобрать"))])
+                    let title = List::new(vec![ListItem::new(Span::raw("Select the services to rebuilt"))])
                         .block(Block::default().borders(Borders::ALL));
                     f.render_widget(title, chunks[0]);
 
@@ -124,7 +124,8 @@ fn main() -> anyhow::Result<()> {
                         &mut state,
                         &mut option,
                         &mut screen,
-                        &chosen.clone()
+                        &chosen.clone(),
+                        &mut app.terminal
                     );
                 }
             }
