@@ -2,19 +2,16 @@ mod services;
 mod models;
 pub mod tui;
 pub use tui::keyboard;
+pub use tui::terminal_setup;
 
-use std::{env, io};
+use std::env;
 use ratatui::{
-    backend::CrosstermBackend,
-    Terminal,
     widgets::{Block, Borders, List, ListItem, ListState},
     layout::{Layout, Direction, Constraint},
     text::Span,
 };
 use crossterm::{
     event::{self},
-    terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    execute,
 };
 use crate::keyboard::keyboard_actions::KeyAction;
 use crate::services::parse_compose::parse_services;
@@ -23,19 +20,13 @@ fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
     let services = parse_services(&args)
         .expect("Couldn't parse command line arguments");
-
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
+    let mut app = terminal_setup::app::App::setup()?;
     let mut selected = vec![false; services.len()];
     let mut state = ListState::default();
     state.select(Some(0));
 
     loop {
-        terminal.draw(|f| {
+        app.terminal.draw(|f| {
             let size = f.area();
 
             let chunks = Layout::default()
@@ -78,13 +69,8 @@ fn main() -> anyhow::Result<()> {
                     match action {
                         KeyAction::Quit => break,
                         KeyAction::Enter(chosen) => {
-                            disable_raw_mode()?;
-                            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-                            terminal.show_cursor()?;
-
-                            for s in chosen {
-                                println!("{s}");
-                            }
+                            terminal_setup::terminal_setup::tear_down(&mut app.terminal)?;
+                            // TODO: Docker up
                             return Ok(());
                         },
                         _ => {}
@@ -95,9 +81,6 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-
+    terminal_setup::terminal_setup::after_all(&mut app.terminal)?;
     Ok(())
 }
