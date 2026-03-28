@@ -1239,6 +1239,8 @@ dependencies = [
  "ratatui",
  "serde",
  "serde_yaml",
+ "strum",
+ "strum_macros",
 ]
 
 [[package]]

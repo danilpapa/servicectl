@@ -3,8 +3,10 @@ mod models;
 pub mod tui;
 pub use tui::keyboard;
 pub use tui::terminal_setup;
+pub use tui::screen;
 
 use std::env;
+use std::fmt::Display;
 use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     layout::{Layout, Direction, Constraint},
@@ -15,7 +17,9 @@ use crossterm::{
 };
 use crate::keyboard::keyboard_actions::KeyAction;
 use crate::services::parse_compose::parse_services;
-use crate::services::docker;
+use strum::IntoEnumIterator;
+use crate::screen::AppScreen;
+use crate::tui::options::ActionChoice;
 
 fn main() -> anyhow::Result<()> {
     let current_dir = env::current_dir()?;
@@ -25,74 +29,107 @@ fn main() -> anyhow::Result<()> {
     let mut selected = vec![false; services.len()];
     let mut state = ListState::default();
     state.select(Some(0));
+    let mut screen = AppScreen::SelectServices;
+    let mut option = ActionChoice::BuildSelected;
 
     loop {
-        app.terminal.draw(|f| {
-            let size = f.area();
+        match screen.clone() {
+            AppScreen::SelectServices => {
+                app.terminal.draw(|f| {
+                    let size = f.area();
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([
+                            Constraint::Length(3),
+                            Constraint::Min(1),
+                        ])
+                        .split(size);
 
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(3),
-                    Constraint::Min(1),
-                ])
-                .split(size);
+                    let title = List::new(vec![ListItem::new(Span::raw("Выбери сервисы которые надо пересобрать"))])
+                        .block(Block::default().borders(Borders::ALL));
+                    f.render_widget(title, chunks[0]);
 
-            let title = List::new(vec![ListItem::new(Span::raw("Выбери сервисы которые надо пересобрать"))])
-                .block(Block::default().borders(Borders::ALL));
-            f.render_widget(title, chunks[0]);
+                    let items: Vec<ListItem> = services
+                        .iter()
+                        .enumerate()
+                        .map(|(i, s)| {
+                            let mark = if selected[i] { "[x]" } else { "[ ]" };
+                            ListItem::new(format!("{mark} {s}"))
+                        })
+                        .collect();
 
-            let items: Vec<ListItem> = services
-                .iter()
-                .enumerate()
-                .map(|(i, s)| {
-                    let mark = if selected[i] { "[x]" } else { "[ ]" };
-                    ListItem::new(format!("{mark} {s}"))
-                })
-                .collect();
+                    let list = List::new(items)
+                        .block(Block::default().borders(Borders::ALL).title("Services"))
+                        .highlight_symbol(">> ");
 
-            let list = List::new(items)
-                .block(Block::default().borders(Borders::ALL).title("Services"))
-                .highlight_symbol(">> ");
+                    f.render_stateful_widget(list, chunks[1], &mut state);
+                })?;
 
-            f.render_stateful_widget(list, chunks[1], &mut state);
-        })?;
-
-        if event::poll(std::time::Duration::from_millis(200))? {
-            let result = keyboard::keyboard_interceptor::handle_event(
-                &event::read()?,
-                &mut state,
-                &services,
-                &mut selected,
-            );
-            match result {
-                Ok(action) => {
-                    match action {
-                        KeyAction::Quit => break,
-                        KeyAction::Enter(chosen) => {
-                            terminal_setup::terminal_setup::tear_down(&mut app.terminal)?;
-                            let mut execute: String = String::from("docker compose up --build -d ");
-                            chosen
-                                .iter()
-                                .for_each(|service| {
-                                    execute.push_str(service.as_str());
-                                    execute.push(' ');
-                                });
-
-                            match docker::run_services(&chosen) {
-                                Ok(_) => println!("Services started successfully"),
-                                Err(e) => eprintln!("Error: {e}"),
+                if event::poll(std::time::Duration::from_millis(200))? {
+                    let result = keyboard::keyboard_interceptor::handle_event(
+                        &event::read()?,
+                        &mut state,
+                        &services,
+                        &mut selected,
+                    );
+                    match result {
+                        Ok(action) => {
+                            match action {
+                                KeyAction::Quit => break,
+                                KeyAction::Enter(chosen) => {
+                                    screen = AppScreen::Actions(chosen);
+                                    state.select(Some(0));
+                                },
+                                _ => {}
                             }
-                            return Ok(());
                         },
-                        _ => {}
+                        Err(e) => println!("keyboard error {}", e)
                     }
-                },
-                Err(e) => println!("keyboard error {}", e)
+                }
+            },
+            AppScreen::Actions(chosen) => {
+                app.terminal.draw(|f| {
+                    let size = f.area();
+
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([
+                            Constraint::Length(3),
+                            Constraint::Min(1),
+                        ])
+                        .split(size);
+
+                    let title = List::new(vec![ListItem::new(Span::raw("Select build options"))])
+                        .block(Block::default().borders(Borders::ALL));
+                    f.render_widget(title, chunks[0]);
+
+                    let items: Vec<ListItem> = ActionChoice::iter()
+                        .map(|action| {
+                            ListItem::new(action.to_string())
+                        })
+                        .collect();
+
+                    let list = List::new(items)
+                        .block(Block::default().borders(Borders::ALL).title("Options"))
+                        .highlight_symbol(">> ");
+
+                    f.render_stateful_widget(list, chunks[1], &mut state);
+                })?;
+
+                if event::poll(std::time::Duration::from_millis(200)).unwrap() {
+                    let event = event::read()
+                        .expect("Couldn't read keyboard event");
+                    keyboard::keyboard_interceptor::handle_option(
+                        &event,
+                        &mut state,
+                        &mut option,
+                        &mut screen,
+                        &chosen.clone()
+                    );
+                }
             }
         }
     }
-
     terminal_setup::terminal_setup::after_all(&mut app.terminal)?;
     Ok(())
 }

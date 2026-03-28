@@ -1,0 +1,24 @@
+services:
+  ai_service:
+    build:
+      context: ./ai_service
+    ports:
+      - "8000:8000"
+
+  gateway:
+    build:
+      context: ./gateway
+    ports:
+      - "8080:8080"
+
+  core:
+    build:
+      context: ./core
+    ports:
+      - "8080:8080"
+
+  platform:
+    build:
+      context: ./platform
+    ports:
+      - "8080:8080"
