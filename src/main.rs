@@ -5,7 +5,6 @@ pub use tui::keyboard;
 pub use tui::terminal_setup;
 
 use std::env;
-use std::process::Command;
 use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     layout::{Layout, Direction, Constraint},
@@ -19,8 +18,8 @@ use crate::services::parse_compose::parse_services;
 use crate::services::docker;
 
 fn main() -> anyhow::Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let services = parse_services(&args)
+    let current_dir = env::current_dir()?;
+    let services = parse_services(&current_dir)
         .expect("Couldn't parse command line arguments");
     let mut app = terminal_setup::app::App::setup()?;
     let mut selected = vec![false; services.len()];

@@ -21,23 +21,19 @@ pub fn handle_event(
                         return Ok(Handled)
                     }
                 }
-                return Ok(KeyAction::None)
             },
             KeyCode::Up => {
                 if let Some(index) = state.selected() {
-                    if index - 1 < services.len() {
-                        state.select(Some(index - 1));
-                        return Ok(Handled)
-                    }
+                    let new_index = index.saturating_sub(1);
+                    state.select(Some(new_index));
+                    return Ok(Handled);
                 }
-                return Ok(KeyAction::None)
             },
             KeyCode::Char(' ') => {
                 if let Some(index) = state.selected() {
                     selected[index] = !selected[index];
                     return Ok(Handled)
                 }
-                return Ok(KeyAction::None)
             },
             KeyCode::Enter => {
                 let chosen: Vec<String> = services
@@ -48,10 +44,8 @@ pub fn handle_event(
                     .collect();
                 return Ok(KeyAction::Enter(chosen));
             }
-            _ => {
-                return Ok(KeyAction::None)
-            }
+            _ => {}
         }
     }
-    Err(String::from("Keyboard interceptor error"))
+    Ok(KeyAction::None)
 }
