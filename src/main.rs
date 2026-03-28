@@ -5,6 +5,7 @@ pub use tui::keyboard;
 pub use tui::terminal_setup;
 
 use std::env;
+use std::process::Command;
 use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     layout::{Layout, Direction, Constraint},
@@ -70,7 +71,28 @@ fn main() -> anyhow::Result<()> {
                         KeyAction::Quit => break,
                         KeyAction::Enter(chosen) => {
                             terminal_setup::terminal_setup::tear_down(&mut app.terminal)?;
-                            // TODO: Docker up
+                            let mut execute: String = String::from("docker compose up --build -d ");
+                            chosen
+                                .iter()
+                                .for_each(|service| {
+                                    execute.push_str(service.as_str());
+                                    execute.push(' ');
+                                });
+
+                            let mut cmd = Command::new("docker");
+
+                            cmd.arg("compose")
+                                .arg("up")
+                                .arg("--build")
+                                .arg("-d");
+
+                            for service in services {
+                                cmd.arg(service);
+                            }
+                            let status = cmd.status()?;
+                            if !status.success() {
+                                eprintln!("Docker compose command failed with status: {}", status);
+                            }
                             return Ok(());
                         },
                         _ => {}
