@@ -16,6 +16,7 @@ use crossterm::{
 };
 use crate::keyboard::keyboard_actions::KeyAction;
 use crate::services::parse_compose::parse_services;
+use crate::services::docker;
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -79,19 +80,9 @@ fn main() -> anyhow::Result<()> {
                                     execute.push(' ');
                                 });
 
-                            let mut cmd = Command::new("docker");
-
-                            cmd.arg("compose")
-                                .arg("up")
-                                .arg("--build")
-                                .arg("-d");
-
-                            for service in services {
-                                cmd.arg(service);
-                            }
-                            let status = cmd.status()?;
-                            if !status.success() {
-                                eprintln!("Docker compose command failed with status: {}", status);
+                            match docker::run_services(&chosen) {
+                                Ok(_) => println!("Services started successfully"),
+                                Err(e) => eprintln!("Error: {e}"),
                             }
                             return Ok(());
                         },
